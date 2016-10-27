@@ -105,8 +105,12 @@ app.controller("ctrl", ["$scope", function($scope) {
 	
 	requestPetrol(function(data) {
 		for (var pType in data['1']) {
+			// only plot U91
+			if (pType != 'U91') continue;
+			
 			var values = data['1'][pType];
 			for (var i=0; i < values.length; i++) {
+				
 				addMarker('['+pType+'] '+values[i].price, values[i].location.lat, values[i].location.lng);
 			}
 		}
