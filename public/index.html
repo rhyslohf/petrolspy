@@ -1,0 +1,146 @@
+
+
+<html>
+
+<head>
+
+<title>PetrolSpy</title>
+
+<script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.1/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.0.1/dist/leaflet.js"></script>
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.6/angular.min.js"></script>
+
+</head>
+
+
+<style>
+
+#map { 
+	height: 100%;
+	width: 100%;
+	
+}
+
+</style>
+
+<body>
+
+<div class="container-fluid" ng-app="app" ng-controller="ctrl">
+
+	<div class="col-md-4">
+		
+		<br>
+		<button class="btn btn-default" ng-class="{'btn btn-primary':day==1, 'btn btn-default':day!=1}" ng-click="selectDay(1)">Day 1</button>
+		<button class="btn btn-default" ng-class="{'btn btn-primary':day==2, 'btn btn-default':day!=2}" ng-click="selectDay(2)">Day 2</button>
+		<button class="btn btn-default" ng-class="{'btn btn-primary':day==3, 'btn btn-default':day!=3}" ng-click="selectDay(3)">Day 3-7</button>
+		<br>
+		
+		<div class="panel panel-default">
+			<ul class="list-group">
+				<li class="list-group-item" ng-repeat="(key,value) in averages[day]" ng-if="key.substring(0,1)=='U'">
+					<h2 class="lead">{{key}}</h2>
+					<h2>${{value}}</h2>
+				</li>
+			</ul>
+		</div>
+	
+	</div>
+	
+	<div class="col-md-8">	
+		<div id="map"></div>
+	</div>
+</div>
+
+
+
+</body>
+
+
+<script>
+
+
+var app = angular.module('app', []);
+
+app.controller("ctrl", ["$scope", function($scope) {
+	var MAPID = 'map';
+	var LAT = -34.9285;
+	var LNG = 138.6007;
+	var REQ = '/petrol';
+
+	var map = L.map(MAPID).setView([LAT,LNG], 13);
+	
+	var values = [];
+
+	L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+		attribution: 'Rhys Lohf & Petrol Spy'
+	}).addTo(map);
+
+	var requestPetrol = function(callback) {
+		$.getJSON(REQ, callback);
+	};
+
+	var addMarker = function(string, lat, lng) {
+		L.marker([lat,lng]).addTo(map)
+			.bindPopup(string)
+			.openPopup();
+
+	};
+	
+	var calculateAverages = function(v) {
+		var val = {};
+		for (var t in v) {
+			var t_values = v[t];
+			var avg = 0;
+			for (var i=0; i < t_values.length; i++) {
+				avg += (t_values[i].price);
+			}
+			var avg = avg/t_values.length;
+			val[t] = avg.toFixed(2);
+		}
+		return val;
+	};
+	
+	requestPetrol(function(data) {
+		for (var pType in data['1']) {
+			var values = data['1'][pType];
+			for (var i=0; i < values.length; i++) {
+				addMarker('['+pType+'] '+values[i].price, values[i].location.lat, values[i].location.lng);
+			}
+		}
+		
+		$scope.$apply(function() {
+			$scope.averages = {
+				'1': calculateAverages(data['1']), // 1 day
+				'2': calculateAverages(data['2']), // 2 days
+				'3': calculateAverages(data['3'])  // 3-7 days
+			};
+		});
+	});
+	
+	$scope.day = 1;
+	$scope.selectDay = function(n) { $scope.day = n; };
+
+
+}]);
+
+</script>
+
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
