@@ -1,5 +1,3 @@
-
-
 <html>
 
 <head>
@@ -7,11 +5,15 @@
 <title>PetrolSpy</title>
 
 <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.1/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.0.1/dist/leaflet.js"></script>
-<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.6/angular.min.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/angularjs/1.5.6/angular-sanitize.js"></script>
+
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.1/dist/leaflet.css" />
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://bootswatch.com/flatly/bootstrap.min.css" rel="stylesheet">
 
 </head>
 
@@ -24,127 +26,267 @@
 	
 }
 
+.animate-show {
+  opacity: 1;
+}
+
+.animate-show.ng-hide-add, .animate-show.ng-hide-remove {
+  transition: all linear 0.5s;
+}
+
+.animate-show.ng-hide {
+  opacity: 0;
+}
+
 </style>
 
 <body>
 
-<div class="container-fluid" ng-app="app" ng-controller="ctrl">
-
-	<div class="col-md-4">
-		
-		<br>
-		<button class="btn btn-default" ng-class="{'btn btn-primary':day==1, 'btn btn-default':day!=1}" ng-click="selectDay(1)">Day 1</button>
-		<button class="btn btn-default" ng-class="{'btn btn-primary':day==2, 'btn btn-default':day!=2}" ng-click="selectDay(2)">Day 2</button>
-		<button class="btn btn-default" ng-class="{'btn btn-primary':day==3, 'btn btn-default':day!=3}" ng-click="selectDay(3)">Day 3-7</button>
-		<br>
-		
-		<div class="panel panel-default">
-			<ul class="list-group">
-				<li class="list-group-item" ng-repeat="(key,value) in averages[day]" ng-if="key.substring(0,1)=='U'">
-					<h2 class="lead">{{key}}</h2>
-					<h2>${{value}}</h2>
-				</li>
-			</ul>
+<div class="container" ng-app="app" ng-controller="ctrl">
+    
+	<div ng-if="debug" class="row well">
+		Tab: {{tab}}<br/>
+		Type: {{type}}<br/>
+		MyLat: {{my.latitude}}<br/>
+		MyLon: {{my.longitude}}<br/>
+		Data: {{!!data}}<br/>
+		Types: {{types}}<br/>
+		MaxRadius: {{max_radius}}<br/>
+	</div>
+	
+	
+	<div class="row" ng-show="data">
+		<div class="col-md-12">
+            <div class="btn-group">
+                <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="font-size:35px!important">
+                    Petrol Prices For {{type}} <span class="caret"></span>
+                </button>
+                
+                <ul class="dropdown-menu">
+                    <li ng-repeat="t in types | orderBy:'toString()'" 
+					    ng-click="selectType(t)"><a href="javascript:void(0)">{{t}}</a></li>
+                </ul>
+            </div>
 		</div>
-	
 	</div>
+    
+    <br/>
 	
-	<div class="col-md-8">	
-		<div id="map"></div>
+	<div class="row well" ng-show="data">
+		<div class="col-md-6 col-sm-12 visible-md-*">
+            <h2>Adelaide</h2>
+            <div ng-show="min_avg_adl">
+                <table>
+                    <tr><td><h3 style="padding-right:20px">Cheapest</h3></td><td><h3><span class="label label-success">{{min_avg_adl.min.price.toFixed(2)}}</span></h3></td></tr>
+                    <tr><td><h3 style="padding-right:20px">Average</h3></td><td><h3><span class="label label-info">{{min_avg_adl.avg.toFixed(2)}}</span></h3></td></tr>
+                    <tr><td><h3 style="padding-right:20px">Expensive</h3></td><td><h3><span class="label label-warning">{{min_avg_adl.max.toFixed(2)}}</span></h3></td></tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="col-md-6 hidden-sm hidden-xs">
+            <a target="_blank" href="{{gmap(min_avg_loc.min.obj.location.lat, min_avg_loc.min.obj.location.lon)}}">
+                <h1 style="font-size:50pt;font-size:10vw">
+                    <span class="label label-success">
+                        {{min_avg_adl.min.price}}
+                        <span class="glyphicon glyphicon-new-window" style="font-size:32.5px;font-size:6.5vw;"></span>
+                    </span>
+                </h1>
+            </a>
+        </div>
+    </div>
+    
+    <div class="row well" ng-show="data && my && min_avg_loc">
+		<div class="col-md-6 col-sm-12 visible-md-*">
+            <h2>Local (within {{max_radius}} km): </h2>
+            <div>
+                <table>
+                    <tr><td><h3 style="padding-right:20px">Cheapest</h3></td><td><h3><span class="label label-success">{{min_avg_loc.min.price.toFixed(2)}}</span></h3></td></tr>
+                    <tr><td></td><td><ul>
+                        <li ng-if="min_avg_loc.min" ng-repeat="min in min_avg_loc.min.objs">
+                            <a target="_blank" href="{{gmap(min.location.lat, min.location.lon)}}">
+                                <span class="label label-success">
+                                <img src="img/{{min.icon}}" />
+                                {{min.name}}
+                                </span>
+                            </a>
+                        </li></ul></td></tr>
+                    <tr><td><h3 style="padding-right:20px">Average</h3></td><td><h3><span class="label label-info">{{min_avg_loc.avg.toFixed(2)}}</span></h3></td></tr>
+                    <tr><td><h3 style="padding-right:20px">Expensive</h3></td><td><h3><span class="label label-warning">{{min_avg_loc.max.toFixed(2)}}</span></h3></td></tr>
+                </table>
+            </div>
+		</div>
+        
+        <div class="col-md-6 hidden-sm hidden-xs">
+            <a target="_blank" href="{{gmap(min_avg_adl.min.obj.location.lat, min_avg_adl.min.obj.location.lon)}}">
+                <h1 style="font-size:50pt;font-size:10vw">
+                    <span class="label label-success">
+                        {{min_avg_loc.min.price}}
+                        <span class="glyphicon glyphicon-new-window" style="font-size:32.5px;font-size:6.5vw;"></span>
+                    </span>
+                </h1>
+            </a>
+        </div>
 	</div>
+
 </div>
-
-
-
-</body>
-
 
 <script>
 
+var app = angular.module('app', ['ngSanitize']);
 
-var app = angular.module('app', []);
+app.factory('gps', ['$q', '$window', function ($q, $window) {
+    function getCurrentPosition() {
+        var deferred = $q.defer();
 
-app.controller("ctrl", ["$scope", function($scope) {
-	var MAPID = 'map';
-	var LAT = -34.9285;
-	var LNG = 138.6007;
-	var REQ = '/petrol';
+        if (!$window.navigator.geolocation) {
+			console.log('Geolocation not supported.');
+            deferred.reject('Geolocation not supported.');
+        } else {
+            $window.navigator.geolocation.getCurrentPosition(
+                function (position) {
+                    deferred.resolve(position);
+                },
+                function (err) {
+					console.log(err);
+                    deferred.reject(err);
+                });
+        }
 
-	var map = L.map(MAPID).setView([LAT,LNG], 13);
+        return deferred.promise;
+    }
+
+    return {
+        getPosition: getCurrentPosition
+    };
+}]);
+
+app.factory('prices', function($http) { 
+    return $http.get('/petrol');
+});
+
+
+app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", function($scope, $http, $interval, gps, prices) {
 	
-	var values = [];
-
-	L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-		attribution: 'Rhys Lohf & Petrol Spy'
-	}).addTo(map);
-
-	var requestPetrol = function(callback) {
-		$.getJSON(REQ, callback);
+	var getDistanceFromLatLonInKm = function (lat1,lon1,lat2,lon2) {
+		var R = 6371; // Radius of the earth in km
+		var dLat = deg2rad(lat2-lat1);  // deg2rad below
+		var dLon = deg2rad(lon2-lon1); 
+		var a = 
+			Math.sin(dLat/2) * Math.sin(dLat/2) +
+			Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+			Math.sin(dLon/2) * Math.sin(dLon/2); 
+		var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+		var d = R * c; // Distance in km
+		return d;
 	};
-
-	var addMarker = function(string, lat, lng) {
-		L.marker([lat,lng]).addTo(map)
-			.bindPopup(string)
-			.openPopup();
-
+    
+    var deg2rad = function (deg) {
+		return deg * (Math.PI/180)
 	};
-	
-	var calculateAverages = function(v) {
-		var val = {};
-		for (var t in v) {
-			var t_values = v[t];
-			var avg = 0;
-			for (var i=0; i < t_values.length; i++) {
-				avg += (t_values[i].price);
-			}
-			var avg = avg/t_values.length;
-			val[t] = avg.toFixed(2);
-		}
-		return val;
-	};
-	
-	requestPetrol(function(data) {
-		for (var pType in data['1']) {
-			// only plot U91
-			if (pType != 'U91') continue;
+    
+    var Icon = L.Icon.extend({
+        options: {
+            iconSize:     [32, 32],
+            shadowSize:   [0, 0],
+            iconAnchor:   [32, 32],
+            shadowAnchor: [0, 0],
+            popupAnchor:  [-3, -32]
+        }
+    });
+
+	var calculateMinimumAverage = function(lat, lon, max_distance) {
+		if (!$scope.data) return "";
+        
+		var todaysValues = $scope.data['1'][$scope.type];
+		
+		var total = 0;
+		var length = 0;
+		var min = -1;
+		var max = -1;
+        var min_obj = undefined;
+		var min_objs = [];
+		
+		// for each value, calc distance to 'lat' and 'lon'
+		// ensure that its less than the 'max_distance'
+		for (var i=0; i < todaysValues.length; i++) {
+			var dist = getDistanceFromLatLonInKm(
+				todaysValues[i].location.lat,
+				todaysValues[i].location.lon,
+				lat,
+				lon
+			);
 			
-			var values = data['1'][pType];
-			for (var i=0; i < values.length; i++) {
+			if (max_distance == -1 || dist < max_distance) {
+				total += todaysValues[i].price;
 				
-				addMarker('['+pType+'] '+values[i].price, values[i].location.lat, values[i].location.lng);
+				min = min != -1 ? Math.min(todaysValues[i].price,min) : todaysValues[i].price;
+				if (min == todaysValues[i].price) {
+					min_objs.push(todaysValues[i]);
+                    if (!min_obj) min_obj = todaysValues[i];
+				}
+				
+				max = max != -1 ? Math.max(todaysValues[i].price,max) : todaysValues[i].price;
+
+				length += 1;
 			}
+			
 		}
 		
-		$scope.$apply(function() {
-			$scope.averages = {
-				'1': calculateAverages(data['1']), // 1 day
-				'2': calculateAverages(data['2']), // 2 days
-				'3': calculateAverages(data['3'])  // 3-7 days
-			};
-		});
-	});
+		if (total == 0 || length == 0) return "";
+		var avg = (total/length);
+		return {'min':{'price':min,'objs':min_objs,'obj':min_obj},'avg':avg, 'max':max};
+	};
 	
-	$scope.day = 1;
-	$scope.selectDay = function(n) { $scope.day = n; };
-
-
+    $scope.selectType = function(t) {
+        $scope.type = t;
+        // refresh averages
+        $scope.min_avg_adl = calculateMinimumAverage($scope.adl.lat, $scope.adl.lon, -1);
+        $scope.min_avg_loc = calculateMinimumAverage($scope.my.lat, $scope.my.lon, $scope.max_radius);
+    };
+    
+    $scope.gmap = function(lat, lon) {
+        return "https://www.google.com/maps?q="+lat+","+lon;
+    };
+    
+    //$scope.debug = false;
+    $scope.MAPID = 'map';
+	$scope.adl = {
+		lat: -34.9285,
+		lon: 138.6007
+	};
+	$scope.zoom = 13;
+	$scope.max_radius = 5; // km
+    
+	
+	// load prices
+	prices.then(function(data) {
+		$scope.data = data.data;
+		
+		// get a list of petrol types
+		var types = [];
+		for (var k in data.data['1']) {
+			types.push(k);
+		}
+		
+		$scope.types = types;
+		$scope.type = 'U91';
+        
+        // calculate minimum/avg for adelaide
+        $scope.min_avg_adl = calculateMinimumAverage($scope.adl.lat, $scope.adl.lon, -1);
+        
+        // get location
+        gps.getPosition().then(function(data) {
+            $scope.my = {
+                lat: data.coords.latitude,
+                lon: data.coords.longitude
+            };
+            
+            // calculate minimum/avg for my location
+            $scope.min_avg_loc = calculateMinimumAverage($scope.my.lat, $scope.my.lon, $scope.max_radius);
+        });
+	});
+    
 }]);
 
 </script>
-
-</html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

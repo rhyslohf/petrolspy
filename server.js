@@ -25,7 +25,7 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 			
 			for (var i=0; i < body.message.list.length; i++) {
 				var e = body.message.list[i];
-				var location = {lat:e.location.y, lng:e.location.x};
+				var location = {lat:e.location.y, lon:e.location.x};
 				
 				for (var p in e.prices) {
 					var updatedTime = e.prices[p].updated;
@@ -37,7 +37,9 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 						values['1'][p].push({
 							'time': updatedTime,
 							'price': e.prices[p].amount,
-							'location': location
+							'location': location,
+							'icon': e.icon,
+                            'name': e.name
 						});
 					}
 					
@@ -46,7 +48,9 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 						values['2'][p].push({
 							'time': updatedTime,
 							'price': e.prices[p].amount,
-							'location': location
+							'location': location,
+							'icon': e.icon,
+                            'name': e.name
 						});
 					}
 					
@@ -55,7 +59,9 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 						values['3'][p].push({
 							'time': updatedTime,
 							'price': e.prices[p].amount,
-							'location': location
+							'location': location,
+                            'icon': e.icon,
+                            'name': e.name
 						});
 					}
 				}			
@@ -65,6 +71,7 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 			
 		} else {
 			console.log('>>>> ERROR <<<<');
+			console.log(error);
 			callback();
 		}
 		
