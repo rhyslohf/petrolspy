@@ -39,7 +39,8 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 							'price': e.prices[p].amount,
 							'location': location,
 							'icon': e.icon,
-                            'name': e.name
+                            'name': e.name,
+							'age': timeDifferentInMilliseconds
 						});
 					}
 					
@@ -50,7 +51,8 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 							'price': e.prices[p].amount,
 							'location': location,
 							'icon': e.icon,
-                            'name': e.name
+                            'name': e.name,
+							'age': timeDifferentInMilliseconds
 						});
 					}
 					
@@ -61,7 +63,8 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 							'price': e.prices[p].amount,
 							'location': location,
                             'icon': e.icon,
-                            'name': e.name
+                            'name': e.name,
+							'age': timeDifferentInMilliseconds
 						});
 					}
 				}			
