@@ -331,7 +331,7 @@ app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", functio
 			step: 5,
 			value: [round5(Math.floor($scope.min_avg_adl.min.price)), round5(Math.ceil($scope.min_avg_adl.max))],
 			range: true,
-			tooltip: 'always'
+			tooltip: 'hide'
 		};
 		
 		$scope.slider = { value: [slider_properties.min, slider_properties.max] };
