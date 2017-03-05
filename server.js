@@ -8,12 +8,14 @@ var NELNG = 138.7992493776611;
 var SWLAT = -35.0632739887249;
 var SWLNG = 138.2543961672119;
 
-var DAYS = 24;
 var EPOCH = function() { return parseInt((new Date()).getTime()); };
+
+// cache results for 5 minutes
+var CACHE_STORE = null;
 
 var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 	
-	var values = {'1':{},'2':{},'3':{}};
+	var values = [];
 	
 	var url = REQ+'?'+'neLat='+nelat+'&neLng='+nelng+'&swLat='+swlat+'&swLng='+swlng;
 	request({
@@ -21,8 +23,6 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 		json: true
 	}, function(error, response, body) {
 		if (!error && response.statusCode === 200) {
-			//callback(body.message.list);
-			
 			for (var i=0; i < body.message.list.length; i++) {
 				var e = body.message.list[i];
 				var location = {lat:e.location.y, lon:e.location.x};
@@ -31,42 +31,22 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 					var updatedTime = e.prices[p].updated;
 					var timeDifferentInMilliseconds = EPOCH()-updatedTime;
 					var hoursOld = parseInt(timeDifferentInMilliseconds/1000/60/60);
-										
-					if (hoursOld <= 1*DAYS) {
-						if (!values['1'][p]) values['1'][p] = [];
-						values['1'][p].push({
-							'time': updatedTime,
-							'price': e.prices[p].amount,
-							'location': location,
-							'icon': e.icon,
-                            'name': e.name,
-							'age': timeDifferentInMilliseconds
-						});
-					}
 					
-					if (hoursOld >= 1*DAYS && hoursOld <= 2*DAYS) {
-						if (!values['2'][p]) values['2'][p] = [];
-						values['2'][p].push({
-							'time': updatedTime,
-							'price': e.prices[p].amount,
-							'location': location,
-							'icon': e.icon,
-                            'name': e.name,
-							'age': timeDifferentInMilliseconds
-						});
-					}
+					// we only care about things that have been updated in the last 24 hrs
 					
-					if (hoursOld >= 3*DAYS && hoursOld <= 7*DAYS) {
-						if (!values['3'][p]) values['3'][p] = [];
-						values['3'][p].push({
-							'time': updatedTime,
-							'price': e.prices[p].amount,
-							'location': location,
-                            'icon': e.icon,
-                            'name': e.name,
-							'age': timeDifferentInMilliseconds
-						});
-					}
+					if (hoursOld > 24) continue;
+					
+					var tidyObj = {
+						'time': updatedTime,
+						'price': e.prices[p].amount,
+						'location': location,
+						'icon': e.icon,
+						'name': e.name,
+						'age': timeDifferentInMilliseconds,
+						'type': e.prices[p]['type']
+					};
+					
+					values.push(tidyObj);
 				}			
 			}
 			
@@ -81,10 +61,36 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 	});
 };
 
+var cache = function(data) {
+
+	if (!data) {
+		// if fresh cache
+		if (CACHE_STORE && ((new Date().getTime() - CACHE_STORE.timestamp)/1000) < 300) {
+			console.log('using cache');
+			return CACHE_STORE;
+		} else {
+			CACHE_STORE = null;
+			return null;
+		}
+	} else {
+		console.log('caching');
+		// set cache
+		CACHE_STORE = {timestamp: new Date().getTime(), data:data};
+		return CACHE_STORE;
+	}
+	
+	return null;
+};
+
 app.get('/petrol', function (req, res) {
-	requestPetrol(NELAT,NELNG,SWLAT,SWLNG, function(data) {
-		res.json(data);
-	});
+	if (cache()) {
+		res.json(cache().data);
+	} else {
+		requestPetrol(NELAT,NELNG,SWLAT,SWLNG, function(data) {
+			cache(data);
+			res.json(data);
+		});
+	}
 });
 
 app.use(express.static('public'));

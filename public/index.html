@@ -20,9 +20,12 @@
 <script src="js/leaflet.js"></script>
 <link href="css/leaflet.css" rel="stylesheet">
 
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/9.7.0/bootstrap-slider.min.js"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/9.7.0/css/bootstrap-slider.min.css" rel="stylesheet">
+
+<!-- charts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/1.0.2/Chart.min.js"></script>
+
 
 </head>
 
@@ -32,7 +35,10 @@
 #map { 
 	height: 100%;
 	width: 100%;
-	
+}
+
+.no-padding {
+	padding:0;
 }
 
 .animate-show {
@@ -51,109 +57,49 @@
 	padding-top:10px;
 }
 
+.full {
+height:100%;
+width: 100%;
+overflow:hidden !important;
+}
+
+
 </style>
 
-<body>
+<body class="full">
 
-<div class="container" ng-app="app" ng-controller="ctrl">
-    
-	<div ng-if="debug" class="row well">
-		Tab: {{tab}}<br/>
-		Type: {{type}}<br/>
-		MyLat: {{my.latitude}}<br/>
-		MyLon: {{my.longitude}}<br/>
-		Data: {{!!data}}<br/>
-		Types: {{types}}<br/>
-		MaxRadius: {{max_radius}}<br/>
-		Map: {{map}}
+<div class="container-fluid no-padding full" ng-app="app" ng-controller="ctrl">
+
+	<div ng-if="true" class="row well" style="position:absolute; right:0; z-index:3">
+		<button ng-click="clearLog()">clear</button>
+		<pre>{{values.log | json }}</pre>
 	</div>
 	
-	<div class="row" ng-show="data">
-		<div class="col-md-12">
+	<div class="row" style="width:100%;position:absolute; z-index:2">
+		<div class="text-center">
+			<button type="button" class="btn btn-default" style="font-size:35px!important">
+				{{min}} - {{med}} - {{max}}
+			</button>
+		</div>
+	</div>
+	
+	<div class="row" ng-show="values.data" style="position:absolute; z-index:2">
+		<div class="col-md-offset-4 col-md-4">
             <div class="btn-group">
                 <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="font-size:35px!important">
-                    Petrol Prices For {{type}} <span class="caret"></span>
+                    {{values.type}} <span class="caret"></span>
                 </button>
                 
                 <ul class="dropdown-menu">
-                    <li ng-repeat="t in types | orderBy:'toString()'" 
+                    <li ng-repeat="t in values.types | orderBy:t" 
 					    ng-click="selectType(t)"><a href="javascript:void(0)">{{t}}</a></li>
                 </ul>
             </div>
 		</div>
 	</div>
     
-    <br/>
+	<div id="map" style="z-index:1"></div>
 	
-	<div class="row well" ng-show="data">
-		<div class="col-md-6 col-sm-12 visible-md-*">
-            <h2>Adelaide</h2>
-            <div ng-show="min_avg_adl">
-                <table>
-                    <tr><td><h3 style="padding-right:20px">Cheapest</h3></td><td><h3><span class="label label-success">{{min_avg_adl.min.price.toFixed(2)}}c</span></h3></td></tr>
-                    <tr><td><h3 style="padding-right:20px">Average</h3></td><td><h3><span class="label label-info">{{min_avg_adl.avg.toFixed(2)}}c</span></h3></td></tr>
-                    <tr><td><h3 style="padding-right:20px">Expensive</h3></td><td><h3><span class="label label-warning">{{min_avg_adl.max.toFixed(2)}}c</span></h3></td></tr>
-                </table>
-            </div>
-        </div>
-        
-        <div class="col-md-6 hidden-sm hidden-xs">
-            <a target="_blank" href="{{gmap(min_avg_loc.min.obj.location.lat, min_avg_loc.min.obj.location.lon)}}">
-                <h1 style="font-size:25pt;font-size:5vw">
-                    <span class="label label-success">
-                        {{min_avg_adl.min.price}}c
-                        <span class="glyphicon glyphicon-new-window" style="font-size:15px;font-size:3vw;"></span>
-                    </span>
-                </h1>
-            </a>
-        </div>
-    </div>
-    
-    <div class="row well" ng-show="data && my && min_avg_loc">
-		<div class="col-md-6 col-sm-12 visible-md-*">
-            <h2>Local (within {{max_radius}} km): </h2>
-            <div>
-                <table>
-                    <tr><td><h3 style="padding-right:20px">Cheapest</h3></td><td><h3><span class="label label-success">{{min_avg_loc.min.price.toFixed(2)}}c</span></h3></td></tr>
-                    <tr><td></td><td><ul>
-                        <li ng-if="min_avg_loc.min" ng-repeat="min in min_avg_loc.min.objs">
-                            <a target="_blank" href="{{gmap(min.location.lat, min.location.lon)}}">
-                                <span class="label label-success">
-                                <img src="img/{{min.icon}}" />
-                                {{min.name}} ({{ageToTime(min.age)}})
-                                </span>
-                            </a>
-                        </li></ul></td></tr>
-                    <tr><td><h3 style="padding-right:20px">Average</h3></td><td><h3><span class="label label-info">{{min_avg_loc.avg.toFixed(2)}}c</span></h3></td></tr>
-                    <tr><td><h3 style="padding-right:20px">Expensive</h3></td><td><h3><span class="label label-warning">{{min_avg_loc.max.toFixed(2)}}c</span></h3></td></tr>
-                </table>
-            </div>
-		</div>
-        
-        <div class="col-md-6 hidden-sm hidden-xs">
-            <a target="_blank" href="{{gmap(min_avg_adl.min.obj.location.lat, min_avg_adl.min.obj.location.lon)}}">
-                <h1 style="font-size:25pt;font-size:5vw">
-                    <span class="label label-success">
-                        {{min_avg_loc.min.price}}c
-                        <span class="glyphicon glyphicon-new-window" style="font-size:15px;font-size:3vw;"></span>
-                    </span>
-                </h1>
-            </a>
-        </div>
-	</div>
-	
-	<div class="row well">
-		<h2>Map: </h2>
-		
-		<h3>Showing petrol stations with price between <b>{{slider.value[0]}}c</b> and <b>{{slider.value[1]}}c</b></h3>
-		
-		<input type="text" id="map_slider" style="width:100%;"></input>
-		
-		<br/>
-		
-		<div id="map_parent"></div>
-	</div>
-
 </div>
 
 <script>
@@ -192,7 +138,7 @@ app.factory('prices', function($http) {
 
 
 app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", function($scope, $http, $interval, gps, prices) {
-	
+
 	var getDistanceFromLatLonInKm = function (lat1,lon1,lat2,lon2) {
 		var R = 6371; // Radius of the earth in km
 		var dLat = deg2rad(lat2-lat1);  // deg2rad below
@@ -219,205 +165,210 @@ app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", functio
             popupAnchor:  [-3, -32]
         }
     });
-
-	var calculateMinimumAverage = function(lat, lon, max_distance) {
-		if (!$scope.data) return "";
-        
-		var todaysValues = $scope.data['1'][$scope.type];
-		
-		var total = 0;
-		var length = 0;
-		var min = -1;
-		var max = -1;
-        var min_obj = undefined;
-		var min_objs = [];
-		
-		// for each value, calc distance to 'lat' and 'lon'
-		// ensure that its less than the 'max_distance'
-		for (var i=0; i < todaysValues.length; i++) {
-			var dist = getDistanceFromLatLonInKm(
-				todaysValues[i].location.lat,
-				todaysValues[i].location.lon,
-				lat,
-				lon
-			);
-			
-			if (max_distance == -1 || dist < max_distance) {
-				total += todaysValues[i].price;
-				
-				min = min != -1 ? Math.min(todaysValues[i].price,min) : todaysValues[i].price;
-				if (min == todaysValues[i].price) {
-					min_objs.push(todaysValues[i]);
-                    if (!min_obj) min_obj = todaysValues[i];
-				}
-				
-				max = max != -1 ? Math.max(todaysValues[i].price,max) : todaysValues[i].price;
-
-				length += 1;
-			}
-			
-		}
-		
-		if (total == 0 || length == 0) return "";
-		var avg = (total/length);
-		return {'min':{'price':min,'objs':min_objs,'obj':min_obj},'avg':avg, 'max':max};
-	};
 	
-    $scope.selectType = function(t) {
-        $scope.type = t;
-        // refresh averages
-        $scope.min_avg_adl = calculateMinimumAverage($scope.adl.lat, $scope.adl.lon, -1);
-        $scope.min_avg_loc = calculateMinimumAverage($scope.my.lat, $scope.my.lon, $scope.max_radius);
-    };
-    
-    $scope.gmap = function(lat, lon) {
+	var ageToTime = function(timestamp) {
+		return moment.duration(timestamp).humanize();
+	};
+
+    var gmap = function(lat, lon) {
         return "https://www.google.com/maps?q="+lat+","+lon;
     };
 	
-	$scope.ageToTime = function(timestamp) {
-		return moment.duration(timestamp).humanize();
-	};
-    
-	$scope.initMap = function(data) {
-		$('#map_parent').empty();
-		$('#map_parent').append($('<div id="map"></div>'));
-		$('#map').width($('#map_parent').width());
-		$('#map').height($('#map').width());
-		$('#map').css('background-color','black');
-		
-		// create the map
-		var pos = $scope.my ? [$scope.my.lat, $scope.my.lon] : [$scope.adl.lat, $scope.adl.lon];
-		var zoom = 14;
-		
-		$scope.map = L.map('map').setView(pos, zoom);
-		
-		L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-			attribution: 'Rhys Lohf & PetrolSpy'
-		}).addTo($scope.map);
-		
-		for (var i=0; i < data['1'][$scope.type].length; i++) {
-			var obj = data['1'][$scope.type][i];
-			var marker = $scope.addMarker(obj.location.lat, obj.location.lon, obj.price + ' (as of ' + ($scope.ageToTime(obj.age)) + ' ago)', obj.icon);
-			$scope.markers.push(marker);
-		}
+	var addLog = function(l) {
+		if ($scope.values.log) 
+			$scope.values.log.push(l);
 	};
 	
-	$scope.addMarker = function(lat, lon, popup_string, icon) {
-		if ($scope.map && lat && lon) {
+	$scope.clearLog = function() { 
+		$scope.values.log = [];
+	};
+	
+	$scope.initMap = function(data) {
+		addLog('initMap');
+	
+		addLog('reset map');
+		$('#map_parent').empty();
+		
+		addLog('load map');
+		$('#map_parent').append($('<div id="map"></div>'));
+		
+		addLog('set map size');
+		$('#map').width($('#map_parent').width());
+		$('#map').height($('#map_parent').height());
+		$('#map').css('background-color','white');
+		
+		addLog('set map to adelaide');
+		var pos = [$scope.values.location.adelaide.lat, $scope.values.location.adelaide.lat];
+		var zoom = 14;
+		
+		// extend the map for the nearest petrol station
+		// TODO: maybe we want the nearest cheapest?
+		
+		// set the view of the map
+		$scope.values.map = L.map('map', {zoomControl:false}).setView(pos, zoom);
+		
+		addLog('add map tiles');
+		L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+			attribution: 'Rhys Lohf & PetrolSpy'
+		}).addTo($scope.values.map);
+		
+		addLog('add markers');
+		addMarkers(data);
+	};
+	
+	var addMarkers = function(data) {
+		addLog('remove existing petrol station markers');
+		angular.forEach($scope.values.markers, function(obj,key) {
+			$scope.removeMarker($scope.values.map, obj);
+		});
+		
+		addLog('add new relevant petrol station markers');
+		angular.forEach(data, function(obj, key) {
+		
+			// skip if !type
+			if (obj.type != $scope.values.type) return true;
+		
+			// prepare string for on click
+			var asOf = '(as of ' + (ageToTime(obj.age)) + ' ago)';
+			var clickString = obj.price + ' ' + asOf;
+			
+			// create/add marker
+			var marker = $scope.addMarker($scope.values.map, obj.location.lat, obj.location.lon, clickString, obj.icon);
+			
+			// store type on the marker
+			marker.type = obj.type;
+			
+			// keep it
+			$scope.values.markers.push(marker);
+		});
+	};
+	
+	$scope.addMarker = function(map, lat, lon, clickString, icon) {
+		if (map && lat && lon) {
 			if (icon) {
 				var i = L.Icon.extend({
 					options: {
 						iconUrl: 'img/'+icon,
 						iconSize:     [32, 32],
-						popupAnchor:  [-3, -32]
+						popupAnchor:  [-0, -15]
 					}
 				});
 				
-				var marker = L.marker([lat, lon], {icon: new i}).addTo($scope.map).bindPopup(popup_string);;
+				var marker = L.marker([lat, lon], {icon: new i}).addTo(map).bindPopup(clickString);
 				return marker;
 			} else {
-				var marker = L.marker([lat, lon]).addTo($scope.map).bindPopup(popup_string);;
+				var marker = L.marker([lat, lon]).addTo(map).bindPopup(clickString);
 				return marker;
 			}
 		}
 	};
 	
-	$scope.initSlider = function() {
-		function round5(x) { return Math.ceil((x-1)/5)*5; };
-		
-		var slider_properties = {
-			min: round5(Math.floor($scope.min_avg_adl.min.price)),
-			max: round5(Math.ceil($scope.min_avg_adl.max)),
-			step: 5,
-			value: [round5(Math.floor($scope.min_avg_adl.min.price)), round5(Math.ceil($scope.min_avg_adl.max))],
-			range: true,
-			tooltip: 'hide'
-		};
-		
-		$scope.slider = { value: [slider_properties.min, slider_properties.max] };
-		
-		var slider = $("#map_slider").slider(slider_properties);
-		
-		slider.on('change', function(s){ 
-			$scope.$apply(function() {
-				$scope.slider.value[0] = parseInt(s.target.value.split(",")[0]);
-				$scope.slider.value[1] = parseInt(s.target.value.split(",")[1]);
-				
-				// slider value changed
-				// remove all markers
-				for (var i=0; i < $scope.markers.length; i++) {
-					$scope.map.removeLayer($scope.markers[i]);
-				}
-				$scope.markers = [];
-				
-				// add markers that meet the criteria
-				for (var i=0; i < $scope.data['1'][$scope.type].length; i++) {
-					var obj = $scope.data['1'][$scope.type][i];
-					if (obj.price > $scope.slider.value[0] && obj.price < $scope.slider.value[1]) {
-						var marker = $scope.addMarker(obj.location.lat, obj.location.lon, obj.price + ' (as of ' + ($scope.ageToTime(obj.age)) + ' ago)', obj.icon);
-						$scope.markers.push(marker);
-					}
-				}
-			});
-		});
+	$scope.removeMarker = function(map, marker) {
+		map.removeLayer(marker);
 	};
 	
-    //$scope.debug = false;
-    $scope.MAPID = 'map';
-	$scope.adl = {
-		lat: -34.9285,
-		lon: 138.6007
+	$scope.selectType = function(t) { 
+		$scope.values.type = t;
 	};
-	$scope.zoom = 13;
-	$scope.max_radius = 5; // km
-	$scope.markers = [];
-    	
-	// load prices
-	prices.then(function(data) {
-		$scope.data = data.data;
+	
+	var loadPrices = function(data) {
+		addLog('received data');
+		$scope.values.data = data.data;
 		
-		// get a list of petrol types
-		var types = [];
-		for (var k in data.data['1']) {
-			types.push(k);
-		}
-		
-		$scope.types = types;
-		$scope.type = 'U91';
-        
-        // calculate minimum/avg for adelaide
-        $scope.min_avg_adl = calculateMinimumAverage($scope.adl.lat, $scope.adl.lon, -1);
-        
-        // get location
-        gps.getPosition().then(function(data) {
-            $scope.my = {
-                lat: data.coords.latitude,
-                lon: data.coords.longitude
-            };
-            
-            // calculate minimum/avg for my location
-            $scope.min_avg_loc = calculateMinimumAverage($scope.my.lat, $scope.my.lon, $scope.max_radius);
-			
-			if ($scope.map) {
-				// add current location to map, and set its center
-				// TODO:
-				$scope.map.panTo(new L.LatLng($scope.my.lat, $scope.my.lon));
+		angular.forEach(data.data, function(key, value) {
+			if ($scope.values.types.indexOf(key.type) == -1) {
+				$scope.values.types.push(key.type);
 			}
-        });
+		});
+		
+		// default selected type
+		$scope.values.type = $scope.values.types[0];
 		
 		// initialise the map
 		$scope.initMap($scope.data);
-		
-		// configure the map slider
-		$scope.initSlider();
-		
-		// update slider when type changes
-		$scope.$watch('type', function() { $scope.initSlider(); });
-		
-		
+
+	};
 	
+	var loadLocation = function() {
+		// get my location
+		gps.getPosition().then(function(data) {
+
+			$scope.values.location.my = {
+				lat: data.coords.latitude,
+				lon: data.coords.longitude
+			};
+			
+		});
+	};
+	
+	var panMapTo = function(map, location) {
+		map.panTo(new L.LatLng(location.lat, location.lon));
+	};
+	
+	// watch for my location being set
+	$scope.$watch('values.location.my', function() {
+		if ($scope.values.location.my) {
+			addLog('values.location.my changed');
+
+			if ($scope.map) {
+			
+				addLog('.. and map exists');
+				
+				addLog('panning map to my location');
+				panMapTo($scope.map, $scope.values.location.my);
+				
+				//TODO:
+				// extend the map with my location and the next cheapest?
+			}
+		}
 	});
-    
+	
+	$scope.$watch('values.map', function() {
+		if ($scope.values.map) {
+			addLog('values.map changed');
+			addLog('panning map to adelaide');
+			panMapTo($scope.values.map, $scope.values.location.adelaide)
+		}
+	});
+	
+	$scope.$watch('values.type', function() {
+		if ($scope.values.type) {
+			addLog('values.type changed');
+			
+			addMarkers($scope.values.data);
+		}
+	});
+	
+	// storages
+	$scope.values = {};
+	
+	$scope.values.log = [];
+	
+	// adelaide lat lon
+	$scope.values.location = {};
+	$scope.values.location.adelaide = {
+		lat: -34.9285,
+		lon: 138.6007
+	};
+	
+	$scope.values.location.my = null;
+	
+	// default zoom
+	$scope.values.zoom = 13;
+	
+	// TODO: might not need this anymore
+	// default max radius (in km)
+	$scope.values.max_radius = 5;
+	
+	// markers storage
+	$scope.values.markers = [];
+	
+	// type of petrol storage
+	$scope.values.types = [];
+	
+	// load prices
+	prices.then(loadPrices);
+	
 }]);
 
 </script>
