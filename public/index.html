@@ -23,9 +23,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/9.7.0/bootstrap-slider.min.js"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/9.7.0/css/bootstrap-slider.min.css" rel="stylesheet">
 
-<!-- charts -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/1.0.2/Chart.min.js"></script>
-
+<!-- highlight leaflets -->
+<script src="js/leaflet.marker.highlight.js"></script>
+<link href="css/leaflet.marker.highlight.css" rel="stylesheet">
 
 </head>
 
@@ -75,15 +75,15 @@ overflow:hidden !important;
 		<pre>{{values.log | json }}</pre>
 	</div>
 	
-	<div class="row" style="width:100%;position:absolute; z-index:2">
+	<div class="row" style="width:100%;position:absolute; z-index:2" ng-if="values.min && values.avg && values.max">
 		<div class="text-center">
 			<button type="button" class="btn btn-default" style="font-size:35px!important">
-				{{min}} - {{med}} - {{max}}
+				{{values.min}} - {{values.avg}} - {{values.max}}
 			</button>
 		</div>
 	</div>
 	
-	<div class="row" ng-show="values.data" style="position:absolute; z-index:2">
+	<div class="row" ng-show="values.types" style="position:absolute; z-index:2">
 		<div class="col-md-offset-4 col-md-4">
             <div class="btn-group">
                 <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="font-size:35px!important">
@@ -91,13 +91,13 @@ overflow:hidden !important;
                 </button>
                 
                 <ul class="dropdown-menu">
-                    <li ng-repeat="t in values.types | orderBy:t" 
+                    <li ng-repeat="t in values.types | orderBy:t" ng-if="t !== values.type"
 					    ng-click="selectType(t)"><a href="javascript:void(0)">{{t}}</a></li>
                 </ul>
             </div>
 		</div>
 	</div>
-    
+
 	<div id="map" style="z-index:1"></div>
 	
 </div>
@@ -135,6 +135,8 @@ app.factory('gps', ['$q', '$window', function ($q, $window) {
 app.factory('prices', function($http) { 
     return $http.get('/petrol');
 });
+
+
 
 
 app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", function($scope, $http, $interval, gps, prices) {
@@ -183,7 +185,7 @@ app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", functio
 		$scope.values.log = [];
 	};
 	
-	$scope.initMap = function(data) {
+	$scope.initMap = function(items) {
 		addLog('initMap');
 	
 		addLog('reset map');
@@ -208,48 +210,56 @@ app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", functio
 		$scope.values.map = L.map('map', {zoomControl:false}).setView(pos, zoom);
 		
 		addLog('add map tiles');
-		L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+		var original_style = 'http://{s}.tile.osm.org/{z}/{x}/{y}.png';
+		var CartoDB_DarkMatterNoLabels = 'http://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png';
+		L.tileLayer(CartoDB_DarkMatterNoLabels, {
 			attribution: 'Rhys Lohf & PetrolSpy'
 		}).addTo($scope.values.map);
 		
-		addLog('add markers');
-		addMarkers(data);
+		$scope.values.map.on('moveend', function() {
+			$scope.reevaluate();
+		});
+		
+		
 	};
 	
-	var addMarkers = function(data) {
+	var addMarkers = function(items) {
 		addLog('remove existing petrol station markers');
 		angular.forEach($scope.values.markers, function(obj,key) {
 			$scope.removeMarker($scope.values.map, obj);
 		});
+		$scope.values.markers = [];
 		
-		addLog('add new relevant petrol station markers');
-		angular.forEach(data, function(obj, key) {
-		
+        addLog('add new relevant petrol station markers');
+        angular.forEach(items, function (obj, key) {
 			// skip if !type
 			if (obj.type != $scope.values.type) return true;
 		
 			// prepare string for on click
 			var asOf = '(as of ' + (ageToTime(obj.age)) + ' ago)';
-			var clickString = obj.price + ' ' + asOf;
+			var clickString = obj.price.toFixed(2) + 'c' + "<br/>" + asOf;
 			
 			// create/add marker
 			var marker = $scope.addMarker($scope.values.map, obj.location.lat, obj.location.lon, clickString, obj.icon);
 			
-			// store type on the marker
+			// store price,type on the marker
 			marker.type = obj.type;
+			marker.price = obj.price;
 			
 			// keep it
 			$scope.values.markers.push(marker);
 		});
+
 	};
 	
-	$scope.addMarker = function(map, lat, lon, clickString, icon) {
+	$scope.addMarker = function(map, lat, lon, clickString, icon, size) {
 		if (map && lat && lon) {
 			if (icon) {
+			
 				var i = L.Icon.extend({
 					options: {
 						iconUrl: 'img/'+icon,
-						iconSize:     [32, 32],
+                        iconSize: size || [32, 32],
 						popupAnchor:  [-0, -15]
 					}
 				});
@@ -260,7 +270,10 @@ app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", functio
 				var marker = L.marker([lat, lon]).addTo(map).bindPopup(clickString);
 				return marker;
 			}
-		}
+        } else {
+            alert('error');
+            addLog('error');
+        }
 	};
 	
 	$scope.removeMarker = function(map, marker) {
@@ -271,27 +284,76 @@ app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", functio
 		$scope.values.type = t;
 	};
 	
-	var loadPrices = function(data) {
-		addLog('received data');
-		$scope.values.data = data.data;
-		
-		angular.forEach(data.data, function(key, value) {
-			if ($scope.values.types.indexOf(key.type) == -1) {
-				$scope.values.types.push(key.type);
+	var markersInBounds = function() {
+		var markersInView = [];
+
+		// compare each marker against visibility in the map bounds
+		angular.forEach($scope.values.markers, function(marker, key) {
+			var inBounds = $scope.values.map.getBounds().contains(marker.getLatLng());
+			if (inBounds) {
+				markersInView.push(marker);
 			}
 		});
+		
+		return markersInView;
+	};
+	
+	$scope.reevaluate = function() {
+		// unhighlight all markers
+		angular.forEach($scope.values.markers, function(marker) {
+			marker.disablePermanentHighlight();
+		});
+		
+		var markersInView = markersInBounds();
+		var min = null;
+		var med = null;
+		var max = null;
+		
+		if (markersInView.length > 0) {
+		
+			var total = 0;
+			
+			angular.forEach(markersInView, function(marker, key) {
+				if (!min || marker.price < min) min = marker.price;
+				if (!max || marker.price > max) max = marker.price;
+				total += marker.price;
+			});
+			
+			$scope.$apply(function(){
+				$scope.values.min = min.toFixed(2);
+				$scope.values.avg = (total/markersInView.length).toFixed(2);
+				$scope.values.max = max.toFixed(2);
+			});
+			
+			// highlight the cheap markers
+			var cheapestNearestMarkersInBounds = cheapestMarkers(markersInBounds());
+			if (cheapestNearestMarkersInBounds.length > 0) {
+				angular.forEach(cheapestNearestMarkersInBounds, function(marker) {
+					marker.enablePermanentHighlight();
+				});
+			}
+		}
+	};
+	
+	var loadPrices = function(data) {
+		addLog('received data');
+		$scope.values.items = data.data.items;
+		$scope.values.brands = data.data.brands;
+		$scope.values.types = data.data.types;
 		
 		// default selected type
 		$scope.values.type = $scope.values.types[0];
 		
 		// initialise the map
-		$scope.initMap($scope.data);
+		$scope.initMap($scope.values.items);
 
 	};
 	
 	var loadLocation = function() {
 		// get my location
 		gps.getPosition().then(function(data) {
+
+            addLog("discovered location at " + data.coords.latitude + ", " + data.coords.longitude);
 
 			$scope.values.location.my = {
 				lat: data.coords.latitude,
@@ -303,22 +365,77 @@ app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", functio
 	
 	var panMapTo = function(map, location) {
 		map.panTo(new L.LatLng(location.lat, location.lon));
+    };
+
+    var extendMapTo = function (map, locations) {
+        var bs = [];
+        angular.forEach(locations, function (obj, key) {
+            bs.push(L.latLng(obj.lat, obj.lon));
+        });
+
+        map.fitBounds(L.latLngBounds(bs));
+    };
+	
+	var distanceBetween = function(lat, lon, lat2, lon2) {
+		var R = 6371e3; // metres
+		var φ1 = lat1.toRadians();
+		var φ2 = lat2.toRadians();
+		var Δφ = (lat2-lat1).toRadians();
+		var Δλ = (lon2-lon1).toRadians();
+
+		var a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+			Math.cos(φ1) * Math.cos(φ2) *
+			Math.sin(Δλ/2) * Math.sin(Δλ/2);
+		var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+		var d = R * c;
+		return d;
+	};
+	
+	var nextNearest = function(lat, lon, markers) {
+		// find nearest
+		var nearestDistance = -1;
+		var nearestMarker = null;
+		
+		angular.forEach(markers, function(marker, key) {
+			var d = distanceBetween(lat, lon, marker.getLatLng().lat, marker.getLatLng().lng);
+			if (nearestDistance == -1 || d < nearestDistance) {
+				nearestDistance = d;
+				nearestMarker = marker;
+			}
+		});
+		
+		return nearestMarker;
+	};
+	
+	var cheapestMarkers = function(markers) {
+		var cheapest = -1;
+		var cheapMarkers = [];
+		
+		// find cheapest
+		angular.forEach(markers, function(marker, key) {
+			if (cheapest == -1 || marker.price < cheapest) {
+				cheapest = marker.price;
+			}
+		});
+		
+		// add 2.5%
+		cheapest = cheapest * 1.025;
+		
+		angular.forEach(markers, function(marker, key) {
+			if (marker.price <= cheapest) {
+				cheapMarkers.push(marker);
+			}
+		});
+		
+		return cheapMarkers;
 	};
 	
 	// watch for my location being set
 	$scope.$watch('values.location.my', function() {
 		if ($scope.values.location.my) {
-			addLog('values.location.my changed');
-
-			if ($scope.map) {
-			
-				addLog('.. and map exists');
-				
-				addLog('panning map to my location');
-				panMapTo($scope.map, $scope.values.location.my);
-				
-				//TODO:
-				// extend the map with my location and the next cheapest?
+			if ($scope.values.map) {
+				mapAndLocationReady();
 			}
 		}
 	});
@@ -326,23 +443,73 @@ app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", functio
 	$scope.$watch('values.map', function() {
 		if ($scope.values.map) {
 			addLog('values.map changed');
-			addLog('panning map to adelaide');
-			panMapTo($scope.values.map, $scope.values.location.adelaide)
+            addLog('panning map to adelaide');
+			panMapTo($scope.values.map, $scope.values.location.adelaide);
+				
+            if ($scope.values.location.my) {
+				mapAndLocationReady();
+            }
 		}
 	});
 	
+	var mapAndLocationReady = function() {
+		// add gps location to map
+		var marker = $scope.addMarker($scope.values.map, $scope.values.location.my.lat, $scope.values.location.my.lon, null, 'gps.png', [16,16]);
+	
+		// fit bounds to adelaide, we always use this as a reference
+		extendMapTo($scope.values.map, [$scope.values.location.adelaide, $scope.values.location.my]);
+		
+		$scope.reevaluate();
+	};
+	
 	$scope.$watch('values.type', function() {
+		
 		if ($scope.values.type) {
 			addLog('values.type changed');
 			
-			addMarkers($scope.values.data);
+			// unhighlight all markers
+			angular.forEach($scope.values.markers, function(marker) {
+				marker.disablePermanentHighlight();
+			});
+			
+			// add markers
+			addMarkers($scope.values.items);
+			
+			// highlight the cheap markers
+			var cheapestNearestMarkersInBounds = cheapestMarkers(markersInBounds());
+			if (cheapestNearestMarkersInBounds.length > 0) {
+				angular.forEach(cheapestNearestMarkersInBounds, function(marker) {
+					marker.enablePermanentHighlight();
+				});
+			}
+			
+			// update averages
+			var markersInView = markersInBounds();
+			var min = null;
+			var med = null;
+			var max = null;
+			
+			if (markersInView.length > 0) {
+			
+				var total = 0;
+				
+				angular.forEach(markersInView, function(marker, key) {
+					if (!min || marker.price < min) min = marker.price;
+					if (!max || marker.price > max) max = marker.price;
+					total += marker.price;
+				});
+				
+				$scope.values.min = min.toFixed(2);
+				$scope.values.avg = (total/markersInView.length).toFixed(2);
+				$scope.values.max = max.toFixed(2);
+			}
 		}
 	});
 	
 	// storages
 	$scope.values = {};
 	
-	$scope.values.log = [];
+	$scope.values.log = null;
 	
 	// adelaide lat lon
 	$scope.values.location = {};
@@ -362,13 +529,15 @@ app.controller("ctrl", ["$scope", "$http", "$interval", "gps", "prices", functio
 	
 	// markers storage
 	$scope.values.markers = [];
+	$scope.values.markerGroup = null;
 	
 	// type of petrol storage
 	$scope.values.types = [];
 	
 	// load prices
-	prices.then(loadPrices);
-	
+    prices.then(loadPrices);
+
+    loadLocation();
 }]);
 
 </script>

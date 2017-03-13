@@ -13,9 +13,15 @@ var EPOCH = function() { return parseInt((new Date()).getTime()); };
 // cache results for 5 minutes
 var CACHE_STORE = null;
 
+String.prototype.capitalizeFirstLetter = function() {
+    return this.charAt(0).toUpperCase() + this.slice(1);
+};
+
 var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 	
-	var values = [];
+	var items = [];
+	var brands = {};
+	var types = {};
 	
 	var url = REQ+'?'+'neLat='+nelat+'&neLng='+nelng+'&swLat='+swlat+'&swLng='+swlng;
 	request({
@@ -41,16 +47,23 @@ var requestPetrol = function(nelat,nelng,swlat,swlng,callback) {
 						'price': e.prices[p].amount,
 						'location': location,
 						'icon': e.icon,
+						'brand': e.icon.split('.png')[0].capitalizeFirstLetter(),
 						'name': e.name,
 						'age': timeDifferentInMilliseconds,
 						'type': e.prices[p]['type']
 					};
 					
-					values.push(tidyObj);
+					items.push(tidyObj);
+					brands[tidyObj.brand] = true;
+					types[tidyObj.type] = true;
 				}			
 			}
-			
-			callback(values);
+
+			callback({
+				brands: Object.keys(brands),
+				types: Object.keys(types),
+				items: items
+			});
 			
 		} else {
 			console.log('>>>> ERROR <<<<');

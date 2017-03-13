@@ -6,6 +6,7 @@
   "dependencies": {
     "bootstrap-material-design": "^0.5.10",
     "express": "^4.14.0",
+    "leaflet.marker.highlight": "0.0.3",
     "mdbootstrap": "^4.2.0",
     "request": "^2.76.0"
   },
